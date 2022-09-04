@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+# Simple grammar
+# <term> ::= <int> "+" <term> | <int>
+# This is actually a regular language, so we can use regular expressions
+
+import re
+import sys
+
+term_re = re.compile(r"[0-9]+(\+[0-9]+)*")
+start_code = """section .text
+extern print_char
+extern print_integer
+global _start
+
+_start:"""
+exit_code = """\t; exit(0)
+	mov rax, 60
+	xor rdi, rdi
+	syscall"""
+
+
+def tokenize(s: str):
+    if term_re.fullmatch(s):
+        yield from map(int, s.split("+"))
+
+
+def compile_expression(s: str):
+    tokens = tokenize(s)
+    try:
+        token = next(tokens)
+    except StopIteration:
+        raise ValueError("Invalid expression")
+    yield f"\tmov rdi, {token}"
+    for token in tokens:
+        yield f"\tadd rdi, {token}"
+    yield """\tcall print_integer
+	mov rdi, 10
+	call print_char"""
+
+
+if __name__ == "__main__":
+    print(start_code)
+    for line in sys.stdin:
+        try:
+            # Remove the '\n' from the line
+            for instruction in compile_expression(line[:-1]):
+                print(instruction)
+        except ValueError:
+            print("Invalid expression:", line, file=sys.stderr)
+            sys.exit(1)
+    print(exit_code)
