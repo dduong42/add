@@ -1,15 +1,19 @@
+%define write 1
+%define max_string_size 19
+%define stdout 1
+
 section .text
 global print_char
 global print_integer
 
-; void print_char(int c)
+; void print_char(char c)
 print_char:
 	; [rsp] = rdi
 	push rdi
 
 	; write(1, &c, 1)
-	mov rax, 1
-	mov rdi, 1
+	mov rax, write
+	mov rdi, stdout
 	mov rsi, rsp
 	mov rdx, 1
 	syscall
@@ -17,54 +21,45 @@ print_char:
 	pop rdi
 	ret
 
-; void print_integer(int n)
+; void print_integer(long long n)
 print_integer:
+	push rbp
+	mov rbp, rsp
+
+	; Use rsi to point to the end of the string
+	lea rsi, [rbp - 1]
+
+	; Start to divide
+	mov rax, rdi
+
+	; Check if n < 0
+	test rax, rax
+	jge .divide
+	neg rax
+
+.divide:
+	xor rdx, rdx
+	idiv qword [ten]
+	add dl, '0'
+	mov [rsi], dl
+	dec rsi
+	test rax, rax
+	jne .divide
+
 	; Check if n < 0
 	test rdi, rdi
-	jge .non_negative_integer
+	jge .write
 
-	; Save rdi
-	push rdi
+	mov [rsi], byte '-'
 
-	; putchar('-')
-	mov rdi, '-'
-	call print_char
+.write:
+	mov rax, write
+	mov rdi, stdout
+	mov rdx, rbp
+	sub rdx, rsi
+	syscall
 
-	; Restore rdi
-	pop rdi
-
-	; rdi = -rdi
-	neg rdi
-
-.non_negative_integer:
-	; Clear rdx
-	xor rdx, rdx
-
-	mov rax, rdi
-	; n == rax * 10 + rdx
-	idiv qword [ten]
-
-	; Save rdx
-	push rdx
-	
-	; If rax == 0, print the remainder
-	test rax, rax
-	je .print_remainder
-
-	; Otherwise, recurse
-	; print_integer(n / 10)
-	mov rdi, rax
-	call .non_negative_integer
-
-.print_remainder:
-	; Right now the top of the stack is rdx, the remainder
-	; rdi = rdx	
-	pop rdi
-	; rdi += '0'
-	add rdi, '0'
-
-	; print_char(rdx + '0')
-	call print_char
+	pop rbp
 	ret
 
 section .data
